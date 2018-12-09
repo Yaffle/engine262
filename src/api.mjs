@@ -19,7 +19,8 @@ import {
   SourceTextModuleRecord,
   wellKnownSymbols,
 } from './value.mjs';
-import { ParseScript, ParseModule } from './parse.mjs';
+import { ParseScript, ParseModule, ParseREPLInput } from './parse.mjs';
+import { NewREPLEnvironment } from './environment.mjs';
 import {
   AbruptCompletion,
   Completion,
@@ -198,6 +199,34 @@ class APIRealm {
     }
     module.HostDefined.public.module = module;
     return module.HostDefined.public;
+  }
+
+  createREPLContext() {
+    const env = this.scope(() => {
+      const realm = surroundingAgent.currentRealmRecord;
+      return NewREPLEnvironment(realm.GlobalEnv);
+    });
+    const evaluateREPLInput = (sourceText) => {
+      if (typeof sourceText !== 'string') {
+        throw new TypeError('sourceText must be a string');
+      }
+      return this.scope(() => {
+        const realm = surroundingAgent.currentRealmRecord;
+        const specifier = `${process.cwd()}/repl`;
+        const m = ParseREPLInput(sourceText, realm, env, { specifier, public: { specifier } });
+        if (Array.isArray(m)) {
+          return new ThrowCompletion(m[0]);
+        }
+        Q(m.Instantiate());
+        const promiseToCompletion = m.Evaluate();
+
+        runJobQueue();
+
+        return EnsureCompletion(promiseToCompletion.PromiseResult.properties.get(new Value('0')).Value);
+      });
+    };
+
+    return { evaluateREPLInput };
   }
 
   scope(cb) {

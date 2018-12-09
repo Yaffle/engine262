@@ -40,17 +40,21 @@ import {
   ToString,
   InnerModuleInstantiation,
   InnerModuleEvaluation,
+  NewPromiseCapability,
+  CreateArrayFromList,
   isArrayIndex,
   isIntegerIndex,
 } from './abstract-ops/all.mjs';
 import { EnvironmentRecord, LexicalEnvironment } from './environment.mjs';
 import {
   Completion,
+  EnsureCompletion,
   AbruptCompletion,
   Q,
   X,
 } from './completion.mjs';
-import { OutOfRange, msg } from './helpers.mjs';
+import { OutOfRange, msg, resume } from './helpers.mjs';
+import { Evaluate_ModuleItemList } from './evaluator.mjs';
 
 export function Value(value) {
   if (new.target !== undefined && new.target !== Value) {
@@ -1422,6 +1426,105 @@ export class SourceTextModuleRecord extends ModuleRecord {
     Assert(module.Status === 'evaluated' && module.EvaluationError === Value.undefined);
     Assert(stack.length === 0);
     return Value.undefined;
+  }
+}
+
+function REPLExecution(module) {
+  const moduleCtx = new ExecutionContext();
+  moduleCtx.Function = Value.null;
+  moduleCtx.Realm = module.Realm;
+  moduleCtx.ScriptOrModule = module;
+  // Assert: module has been linked and declarations in its module environment have been instantiated.
+  moduleCtx.VariableEnvironment = module.Environment;
+  moduleCtx.LexicalEnvironment = module.Environment;
+  // Suspend the currently running execution context.
+  surroundingAgent.executionContextStack.push(moduleCtx);
+  const replBody = module.ECMAScriptCode.body;
+
+  const promiseCapability = X(NewPromiseCapability(surroundingAgent.intrinsic('%Promise%')));
+  {
+    const runningContext = surroundingAgent.runningExecutionContext;
+    const asyncContext = runningContext.copy();
+    asyncContext.codeEvaluationState = (function* resumer() {
+      const result = EnsureCompletion(yield* Evaluate_ModuleItemList(replBody));
+      surroundingAgent.executionContextStack.pop(asyncContext);
+      if (result.Type === 'normal') {
+        // TODO: this is terrible, and instead of returning a promise we should probably just pump
+        // the event loop and return the completion `result`
+        Q(Call(promiseCapability.Resolve, Value.undefined, [X(CreateArrayFromList([result.Value || Value.undefined]))]));
+      } else {
+        Assert(result.Type === 'throw');
+        Q(Call(promiseCapability.Reject, Value.undefined, [X(CreateArrayFromList([result.Value]))]));
+      }
+      return Value.undefined;
+    }());
+    surroundingAgent.executionContextStack.push(asyncContext);
+    const result = EnsureCompletion(resume(asyncContext, undefined));
+    Assert(surroundingAgent.runningExecutionContext === runningContext);
+    Assert(result.Type === 'normal' && result.Value === Value.undefined);
+  }
+
+
+  // const result = Evaluate_Module();
+  surroundingAgent.executionContextStack.pop(moduleCtx);
+  // Resume the context that is now on the top of the execution context stack as the running execution context.
+
+  return promiseCapability.Promise;
+}
+
+export class REPLModuleRecord extends SourceTextModuleRecord {
+  Evaluate() {
+    const module = this;
+    Assert(module.Status === 'instantiated');
+    const stack = [];
+
+    let index = 0;
+    // InnerModuleEvaluation
+    module.Status = 'evaluating';
+    module.DFSIndex = index;
+    module.DFSAncestorIndex = index;
+    stack.push(module);
+    for (const required of module.RequestedModules) {
+      const requiredModule = X(HostResolveImportedModule(module, required));
+      index = Q(InnerModuleEvaluation(requiredModule, stack, index));
+      Assert(requiredModule.Status === 'evaluating' || requiredModule.Status === 'evaluated');
+      if (stack.includes(requiredModule)) {
+        Assert(requiredModule.Status === 'evaluating');
+      }
+      if (requiredModule.Status === 'evaluating') {
+        Assert(requiredModule instanceof SourceTextModuleRecord);
+        module.DFSAncestorIndex = Math.min(module.DFSAncestorIndex, requiredModule.DFSAncestorIndex);
+      }
+    }
+    const result = Q(REPLExecution(module));
+    Assert(stack.indexOf(module) === stack.lastIndexOf(module));
+    Assert(module.DFSAncestorIndex <= module.DFSIndex);
+    if (module.DFSAncestorIndex === module.DFSIndex) {
+      let done = false;
+      while (done === false) {
+        const requiredModule = stack.pop();
+        requiredModule.Status = 'evaluated';
+        if (requiredModule === module) {
+          done = true;
+        }
+      }
+    }
+    // END InnerModuleEvaluation
+
+    // Source Text Module Record Evaluate()
+    if (result instanceof AbruptCompletion) {
+      for (const m of stack) {
+        Assert(m.Status === 'evaluating');
+        m.Status = 'evaluated';
+        m.EvaluationError = result;
+      }
+      Assert(module.Status === 'evaluated' && module.EvaluationError === result);
+      return result;
+    }
+    Assert(module.Status === 'evaluated' && module.EvaluationError === Value.undefined);
+    Assert(stack.length === 0);
+
+    return result;
   }
 }
 

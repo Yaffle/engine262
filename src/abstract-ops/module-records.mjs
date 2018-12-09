@@ -85,8 +85,13 @@ export function ModuleDeclarationEnvironmentSetup(module) {
   // Assert: All named exports from module are resolvable.
   const realm = module.Realm;
   Assert(realm !== Value.undefined);
-  const env = NewModuleEnvironment(realm.GlobalEnv);
-  module.Environment = env;
+  let env;
+  if (module.Environment === Value.undefined) {
+    env = NewModuleEnvironment(realm.GlobalEnv);
+    module.Environment = env;
+  } else {
+    env = module.Environment;
+  }
   const envRec = env.EnvironmentRecord;
   for (const ie of module.ImportEntries) {
     const importedModule = X(HostResolveImportedModule(module, ie.ModuleRequest));

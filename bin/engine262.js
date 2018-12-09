@@ -32,7 +32,7 @@ function createRealm() {
   const realm = new Realm({
     resolveImportedModule(referencingModule, specifier) {
       const resolved = path.resolve(path.dirname(referencingModule.specifier), specifier);
-      if (resolved === realm.moduleEntry.specifier) {
+      if (realm.moduleEntry && resolved === realm.moduleEntry.specifier) {
         return realm.moduleEntry;
       }
       if (!fs.existsSync(resolved)) {
@@ -96,11 +96,12 @@ if (process.argv[2]) {
   }
 } else {
   const realm = createRealm();
+  const ctx = realm.createREPLContext();
   repl.start({
     prompt: '> ',
     eval: (cmd, context, filename, callback) => {
-      const result = realm.evaluateScript(cmd);
-      callback(null, result);
+      const completion = ctx.evaluateREPLInput(cmd);
+      callback(null, completion);
     },
     completer: () => [],
     writer: (o) => inspect(o, realm),

@@ -610,6 +610,33 @@ export function GetIdentifierReference(lex, name, strict) {
   }
 }
 
+class REPLEnvironmentRecord extends ModuleEnvironmentRecord {
+  HasLexicalDeclaration() {
+    return Value.false;
+  }
+
+  CreateImportBinding(N, M, N2) {
+    const envRec = this;
+    // Assert(envRec.HasBinding(N) === Value.false);
+    Assert(M instanceof ModuleRecord);
+    // Assert: When M.[[Environment]] is instantiated it will have a direct binding for N2.
+    envRec.bindings.set(N, {
+      indirect: true,
+      target: [M, N2],
+      initialized: true,
+    });
+    return new NormalCompletion(undefined);
+  }
+}
+
+export function NewREPLEnvironment(E) {
+  const env = new LexicalEnvironment();
+  const envRec = new REPLEnvironmentRecord();
+  env.EnvironmentRecord = envRec;
+  env.outerEnvironmentReference = E;
+  return env;
+}
+
 // 8.1.2.2 #sec-newdeclarativeenvironment
 export function NewDeclarativeEnvironment(E) {
   const env = new LexicalEnvironment();
