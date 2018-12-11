@@ -221,11 +221,12 @@ export function PerformEval(x, evalRealm, strictCaller, direct) {
   }
   // If ctx is not already suspended, suspend ctx.
   const evalCtx = new ExecutionContext();
-  evalCtx.Function = Value.null;
+  evalCtx.Function = evalRealm.Intrinsics['%eval%'];
   evalCtx.Realm = evalRealm;
   evalCtx.ScriptOrModule = ctx.ScriptOrModule;
   evalCtx.VariableEnvironment = varEnv;
   evalCtx.LexicalEnvironment = lexEnv;
+  evalCtx.callSite.evalOrigin = surroundingAgent.runningExecutionContext.callSite.copy(surroundingAgent.runningExecutionContext);
   surroundingAgent.executionContextStack.push(evalCtx);
   let result = EvalDeclarationInstantiation(body, varEnv, lexEnv, strictEval);
   if (result.Type === 'normal') {

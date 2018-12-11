@@ -48,6 +48,7 @@ const Parser = acorn.Parser.extend((P) => class Parse262 extends P {
       ...options,
       ecmaVersion: 2019,
       // adds needed ParenthesizedExpression production
+      preserveParens: true,
       locations: true,
       allowAwaitOutsideFunction: repl,
     }, source);

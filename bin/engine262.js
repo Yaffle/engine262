@@ -6,15 +6,6 @@ require('@snek/source-map-support/register');
 const repl = require('repl');
 const fs = require('fs');
 const path = require('path');
-
-let engine262;
-try {
-  engine262 = require('..');
-} catch (e) {
-  require('v8').setFlagsFromString('--harmony-do-expressions');
-  engine262 = require('..');
-}
-
 const {
   initializeAgent,
   inspect,
@@ -24,14 +15,17 @@ const {
   Object: APIObject,
   Abstract,
   Throw,
-} = engine262;
+} = require('..');
 
 initializeAgent();
 
 function createRealm() {
   const realm = new Realm({
     resolveImportedModule(referencingModule, specifier) {
-      const resolved = path.resolve(path.dirname(referencingModule.specifier), specifier);
+      const dir = referencingModule.specifier === 'repl'
+        ? `${process.cwd()}/repl`
+        : path.dirname(referencingModule.specifier);
+      const resolved = path.resolve(dir, specifier);
       if (realm.moduleEntry && resolved === realm.moduleEntry.specifier) {
         return realm.moduleEntry;
       }

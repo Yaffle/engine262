@@ -35,6 +35,7 @@ module.exports = {
     'import/no-extraneous-dependencies': 'off',
     'import/no-mutable-exports': 'off',
     'react/destructuring-assignment': 'off',
+    'react/no-this-in-sfc': 'off',
     'global-require': 'off',
   },
 };

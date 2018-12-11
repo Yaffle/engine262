@@ -68,6 +68,7 @@ function PrepareForOrdinaryCall(F, newTarget) {
   calleeContext.VariableEnvironment = localEnv;
   // Suspend(callerContext);
   surroundingAgent.executionContextStack.push(calleeContext);
+  calleeContext.callSite.isConstructor = newTarget !== Value.undefined;
   return calleeContext;
 }
 

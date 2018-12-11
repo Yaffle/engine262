@@ -214,6 +214,7 @@ export function ModuleExecution(module) {
   // Assert: module has been linked and declarations in its module environment have been instantiated.
   moduleCtx.VariableEnvironment = module.Environment;
   moduleCtx.LexicalEnvironment = module.Environment;
+  moduleCtx.callSite.isToplevel = true;
   // Suspend the currently running execution context.
   surroundingAgent.executionContextStack.push(moduleCtx);
   const result = Evaluate_Module(module.ECMAScriptCode.body);

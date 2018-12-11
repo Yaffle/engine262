@@ -65,5 +65,5 @@ export function* Evaluate_TaggedTemplate({
   const tagFunc = Q(GetValue(tagRef));
   const thisCall = Expression;
   const tailCall = IsInTailPosition(thisCall);
-  return Q(yield* EvaluateCall(tagFunc, tagRef, TemplateLiteral, tailCall));
+  return Q(yield* EvaluateCall(tagFunc, tagRef, TemplateLiteral, tailCall, Expression));
 }

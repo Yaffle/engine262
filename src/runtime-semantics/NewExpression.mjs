@@ -24,6 +24,7 @@ function* EvaluateNew(constructExpr, args = []) {
   if (IsConstructor(constructor) === Value.false) {
     return surroundingAgent.Throw('TypeError', msg('NotAConstructor', constructor));
   }
+  surroundingAgent.runningExecutionContext.callSite.setLocation(constructExpr);
   return Q(Construct(constructor, argList));
 }
 

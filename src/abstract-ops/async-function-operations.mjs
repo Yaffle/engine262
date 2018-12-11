@@ -12,6 +12,7 @@ import { resume } from '../helpers.mjs';
 export function AsyncFunctionStart(promiseCapability, asyncFunctionBody) {
   const runningContext = surroundingAgent.runningExecutionContext;
   const asyncContext = runningContext.copy();
+  asyncContext.promiseCapability = promiseCapability;
   asyncContext.codeEvaluationState = (function* resumer() {
     const result = EnsureCompletion(yield* Evaluate_FunctionBody(asyncFunctionBody));
     // Assert: If we return here, the async function either threw an exception or performed an implicit or explicit return; all awaiting is done.

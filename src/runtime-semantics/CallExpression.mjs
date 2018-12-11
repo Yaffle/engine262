@@ -24,7 +24,7 @@ import { Evaluate } from '../evaluator.mjs';
 import { PerformEval } from '../intrinsics/eval.mjs';
 import { msg } from '../helpers.mjs';
 
-export function* EvaluateCall(func, ref, args, tailPosition) {
+export function* EvaluateCall(func, ref, args, tailPosition, expr) {
   let thisValue;
   if (Type(ref) === 'Reference') {
     if (IsPropertyReference(ref) === Value.true) {
@@ -47,6 +47,7 @@ export function* EvaluateCall(func, ref, args, tailPosition) {
   if (tailPosition) {
     PrepareForTailCall();
   }
+  surroundingAgent.runningExecutionContext.callSite.setLocation(expr);
   const result = Call(func, thisValue, argList);
   // Assert: If tailPosition is true, the above call will not return here
   // but instead evaluation will continue as if the following return has already occurred.
@@ -76,10 +77,11 @@ export function* Evaluate_CallExpression(CallExpression) {
       const strictCaller = CallExpression.strict;
       const evalRealm = surroundingAgent.currentRealmRecord;
       Q(HostEnsureCanCompileStrings(evalRealm, evalRealm));
+      surroundingAgent.runningExecutionContext.callSite.setLocation(CallExpression);
       return Q(PerformEval(evalText, evalRealm, strictCaller, true));
     }
   }
   const thisCall = CallExpression;
   const tailCall = IsInTailPosition(thisCall);
-  return Q(yield* EvaluateCall(func, ref, CallExpression.arguments, tailCall));
+  return Q(yield* EvaluateCall(func, ref, CallExpression.arguments, tailCall, CallExpression));
 }

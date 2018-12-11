@@ -15,7 +15,7 @@ import {
 import { Construct, Assert } from './abstract-ops/all.mjs';
 import { GlobalDeclarationInstantiation } from './runtime-semantics/all.mjs';
 import { Evaluate_Script } from './evaluator.mjs';
-import { msg } from './helpers.mjs';
+import { msg, CallSite } from './helpers.mjs';
 
 export class Agent {
   constructor(options = {}) {
@@ -82,6 +82,8 @@ export class ExecutionContext {
     this.Realm = undefined;
     this.ScriptOrModule = undefined;
     this.LexicalEnvironment = undefined;
+
+    this.callSite = new CallSite(this);
   }
 
   copy() {
@@ -91,6 +93,7 @@ export class ExecutionContext {
     e.Realm = this.Realm;
     e.ScriptOrModule = this.ScriptOrModule;
     e.LexicalEnvironment = this.LexicalEnvironment;
+    e.callSite = this.callSite.copy(e);
     return e;
   }
 }
@@ -117,6 +120,7 @@ export function InitializeHostDefinedRealm() {
   newContext.Function = Value.null;
   newContext.Realm = realm;
   newContext.ScriptOrModule = Value.null;
+  newContext.callSite.isToplevel = true;
   surroundingAgent.executionContextStack.push(newContext);
   const global = Value.undefined;
   const thisValue = Value.undefined;
@@ -153,6 +157,7 @@ export function RunJobs() {
     newContext.Function = Value.null;
     newContext.Realm = nextPending.Realm;
     newContext.ScriptOrModule = nextPending.ScriptOrModule;
+    newContext.callSite.isToplevel = true;
     surroundingAgent.executionContextStack.push(newContext);
     const result = nextPending.Job(...nextPending.Arguments);
     if (result instanceof AbruptCompletion) {
@@ -177,6 +182,7 @@ export function ScriptEvaluation(scriptRecord) {
   scriptCtx.VariableEnvironment = globalEnv;
   scriptCtx.LexicalEnvironment = globalEnv;
   scriptCtx.HostDefined = scriptRecord.HostDefined;
+  scriptCtx.callSite.isToplevel = true;
   // Suspend runningExecutionContext
   surroundingAgent.executionContextStack.push(scriptCtx);
   const scriptBody = scriptRecord.ECMAScriptCode.body;

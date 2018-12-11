@@ -67,6 +67,7 @@ function runJobQueue() {
     newContext.Function = Value.null;
     newContext.Realm = nextPending.Realm;
     newContext.ScriptOrModule = nextPending.ScriptOrModule;
+    newContext.callSite.isToplevel = true;
     surroundingAgent.executionContextStack.push(newContext);
     const result = nextPending.Job(...nextPending.Arguments);
     surroundingAgent.executionContextStack.pop(newContext);
@@ -86,6 +87,7 @@ class APIRealm {
     newContext.Function = Value.null;
     newContext.Realm = realm;
     newContext.ScriptOrModule = Value.null;
+    newContext.callSite.isToplevel = true;
     surroundingAgent.executionContextStack.push(newContext);
     const global = Value.undefined;
     const thisValue = Value.undefined;
@@ -212,7 +214,7 @@ class APIRealm {
       }
       return this.scope(() => {
         const realm = surroundingAgent.currentRealmRecord;
-        const specifier = `${process.cwd()}/repl`;
+        const specifier = 'repl';
         const m = ParseREPLInput(sourceText, realm, env, { specifier, public: { specifier } });
         if (Array.isArray(m)) {
           return new ThrowCompletion(m[0]);

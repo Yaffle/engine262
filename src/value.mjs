@@ -289,6 +289,7 @@ export class BuiltinFunctionValue extends FunctionValue {
         const calleeRealm = F.Realm;
         calleeContext.Realm = calleeRealm;
         calleeContext.ScriptOrModule = F.ScriptOrModule;
+        calleeContext.callSite.isConstructor = true;
         // 8. Perform any necessary implementation-defined initialization of calleeContext.
         surroundingAgent.executionContextStack.push(calleeContext);
         const result = nativeCall(F, argumentsList, undefined, newTarget);
@@ -1437,6 +1438,7 @@ function REPLExecution(module) {
   // Assert: module has been linked and declarations in its module environment have been instantiated.
   moduleCtx.VariableEnvironment = module.Environment;
   moduleCtx.LexicalEnvironment = module.Environment;
+  moduleCtx.callSite.isToplevel = true;
   // Suspend the currently running execution context.
   surroundingAgent.executionContextStack.push(moduleCtx);
   const replBody = module.ECMAScriptCode.body;
