@@ -12,6 +12,7 @@ import {
   ExportEntries_ModuleItemList,
   ImportedLocalNames,
 } from './static-semantics/all.mjs';
+import { Abstract } from './api.mjs';
 
 const HasOwnProperty = Function.call.bind(Object.prototype.hasOwnProperty);
 function deepFreeze(o) {
@@ -70,6 +71,9 @@ const Parser = acorn.Parser.extend((P) => class Parse262 extends P {
 
   parseTopLevel(node) {
     if (this.replOverride) {
+      // REPLInput :
+      //  [lookahead = {] ObjectLiteral[+Await]
+      //  [lookahead != {] Script[+Await, +Import]
       if (this.type.label === '{') {
         const stmt = this.startNode();
         node.body = [this.parseExpressionStatement(stmt, this.parseObj(false))];
@@ -84,6 +88,37 @@ const Parser = acorn.Parser.extend((P) => class Parse262 extends P {
     const body = super.parse();
     deepFreeze(body);
     return body;
+  }
+
+  parseMaybeUnary(refDestructuringErrors, sawUnary) {
+    // Host Extensions
+    // NativeCallExpression :
+    //   `%` Identifier Arguments
+    //
+    // NativeListLiteral :
+    //   `%` `[` ElementList `]`
+    if (this.type.label === '%') {
+      this.next();
+      const node = this.startNode();
+      if (this.eat(acorn.tokTypes.bracketL)) {
+        const list = this.parseExprList(acorn.tokTypes.bracketR, true, false, refDestructuringErrors);
+        this.checkExpressionErrors(refDestructuringErrors, true);
+        node.elements = list;
+        return this.finishNode(node, 'NativeListLiteral');
+      } else {
+        const target = this.parseIdent(false, undefined);
+        if (!Abstract[target.name]) {
+          this.raise(target.start, 'Unknown abstract operator');
+        }
+        node.callee = Abstract[target.name];
+        this.expect(acorn.tokTypes.parenL);
+        const list = this.parseExprList(acorn.tokTypes.parenR, true, false, refDestructuringErrors);
+        this.checkExpressionErrors(refDestructuringErrors, true);
+        node.arguments = list;
+        return this.finishNode(node, 'NativeCallExpression');
+      }
+    }
+    return super.parseMaybeUnary(refDestructuringErrors, sawUnary);
   }
 
   // Adapted from several different places in Acorn.

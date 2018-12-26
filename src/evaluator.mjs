@@ -3,6 +3,7 @@ import {
   NormalCompletion,
   ReturnIfAbrupt,
   UpdateEmpty,
+  Q,
 } from './completion.mjs';
 import {
   isActualAdditiveExpression,
@@ -131,9 +132,11 @@ import {
   Evaluate_VariableStatement,
   Evaluate_WithStatement,
   Evaluate_YieldExpression,
+  ArgumentListEvaluation,
 } from './runtime-semantics/all.mjs';
 import {
   Value,
+  ExternalValue,
 } from './value.mjs';
 import {
   GetValue,
@@ -468,6 +471,24 @@ export function* Evaluate(Production) {
       return yield* Evaluate_Statement(Production);
     case isExpression(Production):
       return yield* Evaluate_Expression(Production);
+    case Production.type === 'NativeCallExpression': {
+      const argList = yield* ArgumentListEvaluation(Production.arguments);
+      ReturnIfAbrupt(argList);
+      const result = Q(Production.callee(...argList.map((a) => (a instanceof ExternalValue ? a.external : a))));
+      if (result instanceof Value) {
+        return result;
+      }
+      return new ExternalValue(result);
+    }
+    case Production.type === 'NativeListLiteral': {
+      const list = [];
+      for (const AssignmentExpression of Production.elements) {
+        const ref = yield* Evaluate(AssignmentExpression);
+        const val = Q(GetValue(ref));
+        list.push(val instanceof ExternalValue ? val.external : val);
+      }
+      return new ExternalValue(list);
+    }
     default:
       throw new OutOfRange('Evaluate', Production);
   }
